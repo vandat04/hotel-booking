@@ -1,0 +1,56 @@
+package hotel_booking.repository;
+
+import hotel_booking.entity.RoomSchedule;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+
+@Repository
+public interface RoomScheduleRepository extends JpaRepository<RoomSchedule, Long> {
+
+    @Query("""
+                SELECT rs FROM RoomSchedule rs
+                WHERE rs.roomId = :roomId
+                AND (:start < rs.endTime AND :end > rs.startTime)
+            """)
+    List<RoomSchedule> findConflicts(Long roomId, LocalDateTime start, LocalDateTime end);
+
+    List<RoomSchedule> findByRoomIdOrderByStartTime(Long roomId);
+
+    @Query("""
+                SELECT DISTINCT rs.roomId
+                FROM RoomSchedule rs
+                WHERE rs.roomId IN :roomIds
+                AND rs.status IN ('BOOKED', 'OCCUPIED', 'BLOCKED')
+                AND rs.startTime < :checkOut
+                AND rs.endTime > :checkIn
+            """)
+    List<Long> findOccupiedRoomIds(
+            List<Long> roomIds,
+            LocalDateTime checkIn,
+            LocalDateTime checkOut
+    );
+
+    void deleteByBookingId(Long bookingId);
+
+    // 🔹 Kiểm tra có conflict với khoảng thời gian extend không
+    boolean existsByRoomIdAndStartTimeLessThanAndEndTimeGreaterThan(
+            Long roomId,
+            LocalDateTime newEndTime,
+            LocalDateTime oldStartTime
+    );
+
+    // 🔹 Lấy schedule cuối cùng của phòng cho booking
+    @Query("SELECT rs FROM RoomSchedule rs " +
+            "WHERE rs.roomId = :roomId AND rs.bookingId = :bookingId " +
+            "ORDER BY rs.endTime DESC")
+    Optional<RoomSchedule> findLastScheduleByRoomId(
+            @Param("roomId") Long roomId,
+            @Param("bookingId") Long bookingId
+    );
+}
