@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 @Repository
 public interface PaymentRepository extends JpaRepository<Payment, Long> {
@@ -23,6 +24,8 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
 
     Optional<Payment> findByBookingIdAndPaymentType(Long bookingId, String paymentType);
 
+    List<Payment> findByBookingIdAndStatus(Long bookingId, String status);
 
+    List<Payment> findByBookingIdIn(Set<Long> bookingIds);
 
 }

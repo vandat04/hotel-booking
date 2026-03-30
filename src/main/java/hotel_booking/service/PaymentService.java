@@ -1,16 +1,24 @@
 package hotel_booking.service;
 
+import hotel_booking.dto.request.PayRequest;
 import hotel_booking.dto.request.PaymentRequest;
-import hotel_booking.entity.Booking;
-import hotel_booking.entity.Payment;
-import hotel_booking.repository.BookingRepository;
-import hotel_booking.repository.PaymentRepository;
+import hotel_booking.dto.response.PaymentItemResponse;
+import hotel_booking.dto.response.PaymentSummaryResponse;
+import hotel_booking.dto.response.RevenueDashboardResponse;
+import hotel_booking.entity.*;
+import hotel_booking.repository.*;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -19,6 +27,9 @@ public class PaymentService {
     private final BookingRepository bookingRepository;
     private final PaymentRepository paymentRepository;
     private final VNPayService vnPayService;
+    private final RoomTypeRepository roomTypeRepository;
+    private final RoomRepository roomRepository;
+    private final RoomKeyRepository roomKeyRepository;
 
     public String createVnPayPayment(Long userId, PaymentRequest req) {
 
@@ -91,7 +102,7 @@ public class PaymentService {
 
             // 🔥 logic chuẩn theo loại payment
             if ("DEPOSIT".equals(payment.getPaymentType())) {
-                booking.setStatus("CONFIRMED");
+                booking.setStatus("BOOKED");
             }
 
             if ("FINAL".equals(payment.getPaymentType())) {
@@ -107,4 +118,280 @@ public class PaymentService {
 
         paymentRepository.save(payment);
     }
+
+    @Transactional
+    public PaymentSummaryResponse calculatePayment(Long bookingId) {
+
+        // 🔥 1. Lấy booking
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new RuntimeException("Booking không tồn tại"));
+
+        // 🔥 2. Check phải CHECKED_OUT
+        if (!"CHECKED_OUT".equals(booking.getStatus())) {
+            throw new RuntimeException("Booking chưa checkout");
+        }
+
+        // 🔥 3. Lấy tất cả payments (để hiển thị)
+        List<Payment> allPayments = paymentRepository.findByBookingId(bookingId);
+
+        // 🔥 4. Lọc payment đã thanh toán
+        List<Payment> paidPayments = allPayments.stream()
+                .filter(p -> "PAID".equals(p.getStatus()))
+                .toList();
+
+        // 🔥 5. Khởi tạo
+        BigDecimal totalPaid = BigDecimal.ZERO;
+        BigDecimal deposit = BigDecimal.ZERO;
+        BigDecimal finalPaid = BigDecimal.ZERO;
+        BigDecimal penalty = BigDecimal.ZERO;
+        BigDecimal extend = BigDecimal.ZERO;
+
+        // 🔥 6. Tính toán
+        for (Payment p : paidPayments) {
+
+            BigDecimal amount = p.getAmount() != null ? p.getAmount() : BigDecimal.ZERO;
+
+            totalPaid = totalPaid.add(amount);
+
+            switch (p.getPaymentType()) {
+                case "DEPOSIT":
+                    deposit = deposit.add(amount);
+                    break;
+                case "FINAL":
+                    finalPaid = finalPaid.add(amount);
+                    break;
+                case "PENALTY":
+                    penalty = penalty.add(amount);
+                    break;
+                case "EXTEND":
+                    extend = extend.add(amount);
+                    break;
+            }
+        }
+
+        // 🔥 7. Tính remaining
+        BigDecimal totalPrice = booking.getTotalPrice() != null
+                ? booking.getTotalPrice()
+                : BigDecimal.ZERO;
+
+        BigDecimal remaining = totalPrice
+                .add(penalty)
+                .add(extend)
+                .subtract(totalPaid);
+
+        if (remaining.compareTo(BigDecimal.ZERO) < 0) {
+            remaining = BigDecimal.ZERO;
+        }
+
+        // 🔥 8. Map DTO
+        List<PaymentItemResponse> paymentDTOs = allPayments.stream()
+                .map(p -> PaymentItemResponse.builder()
+                        .id(p.getId())
+                        .amount(p.getAmount())
+                        .paymentType(p.getPaymentType())
+                        .method(p.getMethod())
+                        .status(p.getStatus())
+                        .createdAt(p.getCreatedAt() != null ? p.getCreatedAt().toString() : null)
+                        .build()
+                )
+                .toList();
+
+        // 🔥 9. Return
+        return PaymentSummaryResponse.builder()
+                .bookingId(bookingId)
+                .totalPrice(totalPrice)
+                .depositPaid(deposit)
+                .finalPaid(finalPaid)
+                .penalty(penalty)
+                .extend(extend)
+                .totalPaid(totalPaid)
+                .remainingAmount(remaining)
+                .payments(paymentDTOs)
+                .build();
+    }
+
+    @Transactional
+    public List<PaymentItemResponse> getPaymentsByBooking(Long bookingId) {
+
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new RuntimeException("Booking không tồn tại"));
+
+        if (!"CHECKED_OUT".equals(booking.getStatus())) {
+            throw new RuntimeException("Booking chưa checkout");
+        }
+
+        return paymentRepository.findByBookingId(bookingId)
+                .stream()
+                .map(p -> PaymentItemResponse.builder()
+                        .id(p.getId())
+                        .amount(p.getAmount())
+                        .paymentType(p.getPaymentType())
+                        .method(p.getMethod())
+                        .status(p.getStatus())
+                        .createdAt(p.getCreatedAt() != null ? p.getCreatedAt().toString() : null)
+                        .build()
+                )
+                .toList();
+    }
+
+    @Transactional
+    public String paySinglePayment(PayRequest request) {
+
+        // 🔥 1. Validate method
+        if (!List.of("CASH", "VNPAY").contains(request.getMethod())) {
+            throw new RuntimeException("Method không hợp lệ");
+        }
+
+        // 🔥 2. Lấy booking
+        Booking booking = bookingRepository.findById(request.getBookingId())
+                .orElseThrow(() -> new RuntimeException("Booking không tồn tại"));
+
+        if (!"CHECKED_OUT".equals(booking.getStatus())) {
+            throw new RuntimeException("Booking chưa checkout");
+        }
+
+        // 🔥 3. Lấy payment theo id
+        Payment payment = paymentRepository.findById(request.getPaymentId())
+                .orElseThrow(() -> new RuntimeException("Payment không tồn tại"));
+
+        // ❗ check payment có thuộc booking không
+        if (!payment.getBookingId().equals(request.getBookingId())) {
+            throw new RuntimeException("Payment không thuộc booking này");
+        }
+
+        // ❗ không cho update lại nếu đã PAID
+        if ("PAID".equals(payment.getStatus())) {
+            throw new RuntimeException("Payment đã thanh toán rồi");
+        }
+
+        // 🔥 4. Update
+        payment.setStatus("PAID");
+        payment.setPaidAt(LocalDateTime.now());
+        payment.setMethod(request.getMethod());
+        payment.setPaidAt(LocalDateTime.now());
+
+        paymentRepository.save(payment);
+
+        // 🔥 5. Check nếu đã thanh toán đủ → FINISHED
+        PaymentSummaryResponse summary = calculatePayment(request.getBookingId());
+
+        if (summary.getRemainingAmount().compareTo(BigDecimal.ZERO) == 0) {
+            booking.setStatus("FINISHED");
+            bookingRepository.save(booking);
+        }
+
+        return "Thanh toán thành công paymentId = " + payment.getId();
+    }
+
+    @Transactional
+    public RevenueDashboardResponse getTodayRevenue(Long typeIdInput) {
+
+        // 🔥 1. Xác định typeId
+        Long typeId = typeIdInput != null
+                ? typeIdInput
+                : roomTypeRepository.findAll()
+                .stream()
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("Không có RoomType"))
+                .getId();
+
+        RoomType roomType = roomTypeRepository.findById(typeId)
+                .orElseThrow(() -> new RuntimeException("RoomType không tồn tại"));
+
+        // 🔥 2. Lấy Rooms
+        List<Room> rooms = roomRepository.findByTypeId(typeId);
+        Set<Long> roomIds = rooms.stream()
+                .map(Room::getId)
+                .collect(Collectors.toSet());
+
+        if (roomIds.isEmpty()) {
+            return emptyResponse(roomType);
+        }
+
+        // 🔥 3. RoomKey → Booking
+        List<RoomKey> roomKeys = roomKeyRepository.findByRoomIdIn(roomIds);
+
+        Set<Long> bookingIds = roomKeys.stream()
+                .map(RoomKey::getBookingId)
+                .collect(Collectors.toSet());
+
+        if (bookingIds.isEmpty()) {
+            return emptyResponse(roomType);
+        }
+
+        // 🔥 4. Booking hôm nay
+        LocalDate today = LocalDate.now();
+
+        List<Booking> bookings = bookingRepository.findByIdIn(bookingIds);
+
+        List<Booking> todayBookings = bookings.stream()
+                .filter(b -> b.getCreatedAt() != null &&
+                        b.getCreatedAt().toLocalDate().equals(today))
+                .toList();
+
+        if (todayBookings.isEmpty()) {
+            return emptyResponse(roomType);
+        }
+
+        // 🔥 5. Expected revenue
+        BigDecimal expectedRevenue = todayBookings.stream()
+                .map(b -> safe(b.getTotalPrice()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        // 🔥 6. Payments
+        Set<Long> todayBookingIds = todayBookings.stream()
+                .map(Booking::getId)
+                .collect(Collectors.toSet());
+
+        List<Payment> payments = paymentRepository.findByBookingIdIn(todayBookingIds);
+
+        // 🔥 7. Actual revenue (PAID)
+        BigDecimal actualRevenue = payments.stream()
+                .filter(p -> "PAID".equals(p.getStatus()))
+                .map(p -> safe(p.getAmount()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        // 🔥 8. Group method + status
+        Map<String, BigDecimal> revenueByMethod = new HashMap<>();
+        Map<String, BigDecimal> revenueByStatus = new HashMap<>();
+
+        for (Payment p : payments) {
+
+            BigDecimal amount = safe(p.getAmount());
+
+            // method
+            String method = p.getMethod() != null ? p.getMethod() : "UNKNOWN";
+            revenueByMethod.merge(method, amount, BigDecimal::add);
+
+            // status
+            String status = p.getStatus();
+            revenueByStatus.merge(status, amount, BigDecimal::add);
+        }
+
+        return RevenueDashboardResponse.builder()
+                .typeId(typeId)
+                .typeName(roomType.getName())
+                .expectedRevenue(expectedRevenue)
+                .actualRevenue(actualRevenue)
+                .revenueByMethod(revenueByMethod)
+                .revenueByStatus(revenueByStatus)
+                .build();
+    }
+
+    // 🔥 helper
+    private BigDecimal safe(BigDecimal value) {
+        return value != null ? value : BigDecimal.ZERO;
+    }
+
+    private RevenueDashboardResponse emptyResponse(RoomType roomType) {
+        return RevenueDashboardResponse.builder()
+                .typeId(roomType.getId())
+                .typeName(roomType.getName())
+                .expectedRevenue(BigDecimal.ZERO)
+                .actualRevenue(BigDecimal.ZERO)
+                .revenueByMethod(new HashMap<>())
+                .revenueByStatus(new HashMap<>())
+                .build();
+    }
+
 }

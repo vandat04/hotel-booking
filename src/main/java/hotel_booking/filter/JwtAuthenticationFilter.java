@@ -40,16 +40,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             filterChain.doFilter(request, response);
             return;
         }
-
         String token = authHeader.substring(7);
-
         // 🔥 check blacklist
         if (invalidTokenRepository.existsByToken(token)) {
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.getWriter().write("Token đã bị vô hiệu hóa");
             return;
         }
-
         // 🔥 lấy userId từ JWT
         String userIdStr = jwtService.extractUserId(token);
 
@@ -58,13 +55,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             if (jwtService.isValid(token)) {
 
                 Long userId = Long.parseLong(userIdStr);
+                UserDetails userDetails = userDetailsService.loadUserById(userId.intValue());
 
-                // 🔥 KHÔNG cần load DB nữa
+                System.out.println(userDetails.getAuthorities());// 🔥 KHÔNG cần load DB nữa
                 UsernamePasswordAuthenticationToken authToken =
                         new UsernamePasswordAuthenticationToken(
                                 userId,   // 🔥 principal = userId
                                 null,
-                                null      // hoặc authorities nếu có
+                                userDetails.getAuthorities()      // hoặc authorities nếu có
                         );
 
                 SecurityContextHolder.getContext().setAuthentication(authToken);

@@ -14,15 +14,6 @@ import java.util.Optional;
 public interface RoomScheduleRepository extends JpaRepository<RoomSchedule, Long> {
 
     @Query("""
-                SELECT rs FROM RoomSchedule rs
-                WHERE rs.roomId = :roomId
-                AND (:start < rs.endTime AND :end > rs.startTime)
-            """)
-    List<RoomSchedule> findConflicts(Long roomId, LocalDateTime start, LocalDateTime end);
-
-    List<RoomSchedule> findByRoomIdOrderByStartTime(Long roomId);
-
-    @Query("""
                 SELECT DISTINCT rs.roomId
                 FROM RoomSchedule rs
                 WHERE rs.roomId IN :roomIds
@@ -53,4 +44,13 @@ public interface RoomScheduleRepository extends JpaRepository<RoomSchedule, Long
             @Param("roomId") Long roomId,
             @Param("bookingId") Long bookingId
     );
+
+    List<RoomSchedule> findByBookingId(Long bookingId);
+
+    @Query("""
+                SELECT rs FROM RoomSchedule rs
+                WHERE rs.roomId = :roomId
+                AND CURRENT_TIMESTAMP BETWEEN rs.startTime AND rs.endTime
+            """)
+    Optional<RoomSchedule> findCurrentByRoomId(Long roomId);
 }

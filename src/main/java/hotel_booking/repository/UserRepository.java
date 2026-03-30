@@ -4,6 +4,7 @@ import hotel_booking.entity.User;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -44,5 +45,14 @@ public interface UserRepository extends JpaRepository<User, Long> {
     List<User> findTop5ByOrderByCreatedAtDesc();
 
     List<User> findByRoleIn(List<String> roles);
+
+    @Query("""
+                SELECT u FROM User u
+                JOIN Attendance a ON u.id = a.userId
+                WHERE u.role = 'CLEANER'
+                AND a.workDate = CURRENT_DATE
+                AND a.status = 1
+            """)
+    List<User> findAvailableCleanersToday();
 
 }

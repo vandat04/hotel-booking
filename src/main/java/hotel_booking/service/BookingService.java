@@ -4,11 +4,15 @@ import hotel_booking.dto.request.*;
 import hotel_booking.dto.response.*;
 import hotel_booking.entity.*;
 import hotel_booking.repository.*;
+import hotel_booking.specification.BookingSpecification;
 import hotel_booking.util.PaginationUtil;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -16,6 +20,7 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 
@@ -32,6 +37,8 @@ public class BookingService {
     private final EmailService emailService;
     private final PaymentRepository paymentRepository;
     private final BookingExtendRepository bookingExtendRepository;
+    private final UserRepository userRepository;
+    private final CleaningTaskRepository cleaningTaskRepository;
 
     // 🔥 Hotel config
     private static final LocalTime CHECK_IN_TIME = LocalTime.of(12, 0);
@@ -103,7 +110,11 @@ public class BookingService {
         RoomType roomType = roomTypeRepository.findById(req.getTypeId())
                 .orElseThrow(() -> new RuntimeException("Room type not found"));
 
-        BigDecimal totalPrice = roomType.getPriceDay().multiply(BigDecimal.valueOf(req.getQuantity()));
+        long days = ChronoUnit.DAYS.between(req.getCheckIn(), req.getCheckOut());
+
+        BigDecimal totalPrice = roomType.getPriceDay()
+                .multiply(BigDecimal.valueOf(days))
+                .multiply(BigDecimal.valueOf(req.getQuantity()));
 
         Booking booking = Booking.builder()
                 .userId(userId)
@@ -327,6 +338,20 @@ public class BookingService {
             throw new RuntimeException("Booking already cancelled");
         }
 
+        if ("CHECKED_IN".equals(booking.getStatus())) {
+            throw new RuntimeException("Cannot cancel after check-in");
+        }
+
+        if ("CHECKED_OUT".equals(booking.getStatus())) {
+            throw new RuntimeException("Booking already completed");
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+
+        if (now.isAfter(booking.getCheckIn())) {
+            throw new RuntimeException("Cannot cancel after check-in time");
+        }
+
         List<Payment> payments = paymentRepository.findByBookingId(bookingId);
 
         boolean isDepositPaid = payments.stream()
@@ -334,7 +359,7 @@ public class BookingService {
                         && p.getStatus().equals("PAID"));
 
         long hoursBeforeCheckin = Duration.between(
-                LocalDateTime.now(),
+                now,
                 booking.getCheckIn()
         ).toHours();
 
@@ -353,13 +378,13 @@ public class BookingService {
             cancelFinalOnly(payments);
         }
 
-        // 🔥 update booking
-        booking.setStatus("CANCELLED");
-        bookingRepository.save(booking);
-
         // 🔥 xoá dữ liệu liên quan
         roomKeyRepository.deleteByBookingId(bookingId);
         roomScheduleRepository.deleteByBookingId(bookingId);
+
+        // 🔥 update booking
+        booking.setStatus("CANCELLED");
+        bookingRepository.save(booking);
     }
 
     private void cancelAllPayments(List<Payment> payments) {
@@ -581,5 +606,340 @@ public class BookingService {
 
         return successBooking(booking.getId(), availableRooms.size());
     }
+
+    public BookingListResponse getBookings(
+            int page,
+            int size,
+            String status,
+            String source,
+            String channel,
+            LocalDate fromDate,
+            LocalDate toDate
+    ) {
+
+        Pageable pageable = PageRequest.of(
+                page - 1,
+                size,
+                Sort.by(Sort.Direction.DESC, "createdAt")
+        );
+
+        Specification<Booking> spec = BookingSpecification.filter(
+                status,
+                source,
+                channel,
+                fromDate != null ? fromDate.atStartOfDay() : null,
+                toDate != null ? toDate.atTime(23, 59, 59) : null
+        );
+
+        Page<Booking> bookingPage = bookingRepository.findAll(spec, pageable);
+
+        List<BookingDTO> list = bookingPage.getContent().stream().map(this::toDTO).toList();
+
+        return new BookingListResponse(
+                list,
+                bookingPage.getTotalElements(),
+                page,
+                size
+        );
+    }
+
+    private BookingDTO toDTO(Booking b) {
+        BookingDTO dto = new BookingDTO();
+        dto.setId(b.getId().intValue());
+        if (b.getUserId() != null) {
+            dto.setUserId(b.getUserId().intValue());
+        } else {
+            dto.setUserId(null); // hoặc 0 nếu bạn muốn
+        }
+        dto.setCheckIn(b.getCheckIn());
+        dto.setCheckOut(b.getCheckOut());
+        dto.setBookingType(b.getBookingType());
+        dto.setStatus(b.getStatus());
+        dto.setSource(b.getSource());
+        dto.setChannel(b.getChannel());
+        dto.setTotalPrice(b.getTotalPrice());
+        dto.setCreatedAt(b.getCreatedAt());
+        dto.setNote(b.getNote());
+        dto.setQuantity(b.getQuantity());
+        return dto;
+    }
+
+    public BookingListResponse searchBookings(String keyword, int page, int size) {
+
+        Pageable pageable = PageRequest.of(
+                page - 1,
+                size,
+                Sort.by(Sort.Direction.DESC, "createdAt")
+        );
+
+        Specification<Booking> spec =
+                BookingSpecification.search(keyword);
+
+        Page<Booking> result = bookingRepository.findAll(spec, pageable);
+
+        List<BookingDTO> list = result.getContent()
+                .stream()
+                .map(this::toDTO)
+                .toList();
+
+        return new BookingListResponse(
+                list,
+                result.getTotalElements(),
+                page,
+                size
+        );
+    }
+
+    public BookingDetailResponse getBookingDetail(Long bookingId) {
+
+        // 🔥 check ownership
+        Booking booking = bookingRepository
+                .findById(bookingId)
+                .orElseThrow(() -> new RuntimeException("BOOKING_NOT_FOUND"));
+
+        // 🔥 lấy dữ liệu liên quan
+        List<RoomKey> roomKeys = roomKeyRepository.findByBookingId(bookingId);
+        List<BookingExtend> extendsList = bookingExtendRepository.findByBookingId(bookingId);
+        List<Payment> payments = paymentRepository.findByBookingId(bookingId);
+
+        return BookingDetailResponse.builder()
+                .booking(toBookingResponse(booking))
+                .roomKeys(roomKeys.stream().map(this::toRoomKey).toList())
+                .extendsList(extendsList.stream().map(this::toExtend).toList())
+                .payments(payments.stream().map(this::toPayment).toList())
+                .build();
+    }
+
+    @Transactional
+    public void checkIn(Long bookingId) {
+
+        // ===== STEP 1: LẤY BOOKING =====
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new RuntimeException("Booking not found"));
+
+        // ===== STEP 2: VALIDATE =====
+
+        // 2.1 Status phải là BOOKED
+        if (!"BOOKED".equalsIgnoreCase(booking.getStatus())) {
+            throw new RuntimeException("Booking must be BOOKED to check-in");
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime checkIn = booking.getCheckIn();
+        LocalDateTime checkOut = booking.getCheckOut();
+
+        // 2.2 Chưa tới giờ
+        if (now.isBefore(checkIn)) {
+            throw new RuntimeException("Too early to check-in");
+        }
+
+        // 2.3 Quá giờ checkout
+        if (!now.isBefore(checkOut)) {
+            throw new RuntimeException("Booking expired");
+        }
+
+        // ===== STEP 3: UPDATE BOOKING =====
+        booking.setStatus("CHECKED_IN");
+        bookingRepository.save(booking);
+
+        // ===== STEP 4: UPDATE ROOM SCHEDULE =====
+        List<RoomSchedule> schedules =
+                roomScheduleRepository.findByBookingId(bookingId);
+
+        if (schedules.isEmpty()) {
+            throw new RuntimeException("No RoomSchedules found");
+        }
+
+        for (RoomSchedule rs : schedules) {
+            rs.setStatus("OCCUPIED");
+        }
+        roomScheduleRepository.saveAll(schedules);
+
+        // ===== STEP 5: UPDATE ROOM KEY =====
+        List<RoomKey> keys = roomKeyRepository.findByBookingId(bookingId);
+
+        if (keys.isEmpty()) {
+            throw new RuntimeException("No RoomKeys found");
+        }
+
+        for (RoomKey key : keys) {
+            key.setStatus(1); // ACTIVE
+        }
+        roomKeyRepository.saveAll(keys);
+
+        // ===== DONE =====
+    }
+
+
+    // ============================================
+    // 2️⃣ Create booking (multiple rooms, with payment)
+    // ============================================
+    @Transactional
+    public BookingResponse createBooking( BookingReceptionistRequest req) {
+
+        if (!roomTypeRepository.existsByIdAndStatus(req.getTypeId(), 1))
+            return failBooking(0);
+
+        LocalDateTime checkIn = req.getCheckIn().atTime(CHECK_IN_TIME);
+        LocalDateTime checkOut = req.getCheckOut().atTime(CHECK_OUT_TIME);
+
+        // 🔥 Re-check availability
+        List<Room> availableRooms = roomRepository.findAvailableRoomsForBooking(req.getTypeId(), checkIn, checkOut);
+        if (availableRooms.size() < req.getQuantity())
+            return failBooking(availableRooms.size());
+
+        // 🔥 Select rooms
+        List<Room> selectedRooms = availableRooms.subList(0, req.getQuantity());
+
+        // 🔥 1️⃣ Tạo booking tổng
+        RoomType roomType = roomTypeRepository.findById(req.getTypeId())
+                .orElseThrow(() -> new RuntimeException("Room type not found"));
+
+        long days = ChronoUnit.DAYS.between(req.getCheckIn(), req.getCheckOut());
+
+        BigDecimal totalPrice = roomType.getPriceDay()
+                .multiply(BigDecimal.valueOf(days))
+                .multiply(BigDecimal.valueOf(req.getQuantity()));
+
+        Booking booking = Booking.builder()
+                .userId(null)
+                .checkIn(checkIn)
+                .checkOut(checkOut)
+                .bookingType("DAY")
+                .status("PENDING_PAYMENT")
+                .source("DIRECT")
+                .channel("WALKIN")
+                .totalPrice(totalPrice)
+                .quantity(req.getQuantity())
+                .createdAt(LocalDateTime.now())
+                .note(req.getFullName() + " - " + req.getPhone() + " - " + req.getAddress() )
+                .build();
+
+        bookingRepository.save(booking);
+
+        // 🔥 2️⃣ Tạo RoomKey & RoomSchedule cho từng phòng
+        for (Room room : selectedRooms) {
+            RoomKey key = RoomKey.builder()
+                    .bookingId(booking.getId())
+                    .roomId(room.getId())
+                    .qrCode(UUID.randomUUID().toString())
+                    .numberCode(String.valueOf((int) (Math.random() * 900000 + 100000)))
+                    .status(0)
+                    .expiredAt(checkOut)
+                    .build();
+            roomKeyRepository.save(key);
+
+            RoomSchedule schedule = RoomSchedule.builder()
+                    .roomId(room.getId())
+                    .bookingId(booking.getId())
+                    .startTime(checkIn)
+                    .endTime(checkOut)
+                    .status("BOOKED")
+                    .build();
+            roomScheduleRepository.save(schedule);
+        }
+
+        // 🔥 3️⃣ Tạo Payment (Deposit + Final)
+        BigDecimal depositAmount = totalPrice.multiply(BigDecimal.valueOf(0.3));
+        BigDecimal finalAmount = totalPrice.subtract(depositAmount);
+        String txnRef = String.valueOf(System.currentTimeMillis());
+        Payment depositPayment = Payment.builder()
+                .bookingId(booking.getId())
+                .amount(depositAmount)
+                .paymentType("DEPOSIT")
+                .method("VNPAY")
+                .status("PENDING")
+                .createdAt(LocalDateTime.now())
+                .vnpTxnRef(txnRef)
+                .build();
+        paymentRepository.save(depositPayment);
+
+        Payment finalPayment = Payment.builder()
+                .bookingId(booking.getId())
+                .amount(finalAmount)
+                .paymentType("FINAL")
+                .method("VNPAY")
+                .status("PENDING")
+                .createdAt(LocalDateTime.now())
+                .vnpTxnRef(txnRef)
+                .build();
+        paymentRepository.save(finalPayment);
+
+        // 🔥 6️⃣ Notification RECEPTIONIST
+        Notification receptionistNotification = Notification.builder()
+                .userId(null)
+                .message("Booking mới đã được tạo, vui lòng kiểm tra và xác nhận")
+                .isRead(false)
+                .createdAt(LocalDateTime.now())
+                .role("RECEPTIONIST")
+                .build();
+        notificationRepository.save(receptionistNotification);
+
+        return successBooking(booking.getId(), availableRooms.size());
+    }
+
+    @Transactional
+    public void checkOut(Long bookingId) {
+
+        // 🔥 1. Lấy booking
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new RuntimeException("Booking not found"));
+
+        if (!"CHECKED_IN".equals(booking.getStatus())) {
+            throw new RuntimeException("Booking is not checked-in");
+        }
+
+        // 🔥 2. Update booking -> CHECK_PENALTY
+        booking.setStatus("CHECK_PENALTY");
+        bookingRepository.save(booking);
+
+        // 🔥 3. Lấy danh sách RoomKey
+        List<RoomKey> roomKeys = roomKeyRepository.findByBookingId(bookingId);
+
+        if (roomKeys.isEmpty()) {
+            throw new RuntimeException("No room keys found");
+        }
+
+        // 🔥 4. Lấy CLEANER đang đi làm hôm nay
+        List<User> cleaners = userRepository.findAvailableCleanersToday();
+
+        if (cleaners.isEmpty()) {
+            throw new RuntimeException("No cleaner available");
+        }
+
+        int index = 0;
+
+        // 🔥 5. Loop từng phòng
+        for (RoomKey key : roomKeys) {
+
+            // 👉 5.1 Disable key
+            key.setStatus(0);
+            roomKeyRepository.save(key);
+
+            Long roomId = key.getRoomId();
+
+            // 👉 5.2 Chọn cleaner (round-robin)
+            User cleaner = cleaners.get(index % cleaners.size());
+            index++;
+
+            // 👉 5.3 Tạo cleaning task
+            CleaningTask task = CleaningTask.builder()
+                    .roomId(roomId)
+                    .bookingId(bookingId)
+                    .cleanerId(cleaner.getId().longValue())
+                    .status("DOING")
+                    .createdAt(LocalDateTime.now())
+                    .build();
+
+            cleaningTaskRepository.save(task);
+
+            // 👉 5.4 Update room -> CLEANING
+            Room room = roomRepository.findById(roomId).orElseThrow();
+            room.setStatus("CLEANING");
+            roomRepository.save(room);
+        }
+    }
+
+
 
 }

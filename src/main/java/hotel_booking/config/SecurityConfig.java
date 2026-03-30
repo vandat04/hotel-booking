@@ -31,11 +31,12 @@ public class SecurityConfig {
                         .requestMatchers("/auth/**").permitAll()
                         .requestMatchers("/ota/**").permitAll()
                         .requestMatchers("/hotel/**").permitAll()
-                        .requestMatchers("/admin/**").hasRole("ADMIN")
-                        .requestMatchers("/customer/**").hasRole("CUSTOMER")
-                        .requestMatchers("/cleaner/**").hasRole("CLEANER")
-                        .requestMatchers("/staff/**").hasAnyRole("CLEANER","RECEPTIONIST")
-                        .requestMatchers("/reception/**").hasRole("RECEPTIONIST")
+
+                        .requestMatchers("/admin/**").hasAuthority("ROLE_ADMIN")
+                        .requestMatchers("/customer/**").hasAuthority("ROLE_CUSTOMER")
+                        .requestMatchers("/cleaner/**").hasAuthority("ROLE_CLEANER")
+                        .requestMatchers("/staff/**").hasAnyAuthority("ROLE_CLEANER","ROLE_RECEPTIONIST")
+                        .requestMatchers("/receptionist/**").hasAuthority("ROLE_RECEPTIONIST")
 
                         .anyRequest().authenticated()
                 )
