@@ -6,6 +6,7 @@ import hotel_booking.entity.*;
 import hotel_booking.repository.*;
 import hotel_booking.specification.BookingSpecification;
 import hotel_booking.util.PaginationUtil;
+import jakarta.persistence.criteria.Predicate;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -21,6 +22,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -268,6 +270,26 @@ public class BookingService {
         // 🔥 check ownership
         Booking booking = bookingRepository
                 .findByIdAndUserId(bookingId, userId)
+                .orElseThrow(() -> new RuntimeException("BOOKING_NOT_FOUND"));
+
+        // 🔥 lấy dữ liệu liên quan
+        List<RoomKey> roomKeys = roomKeyRepository.findByBookingId(bookingId);
+        List<BookingExtend> extendsList = bookingExtendRepository.findByBookingId(bookingId);
+        List<Payment> payments = paymentRepository.findByBookingId(bookingId);
+
+        return BookingDetailResponse.builder()
+                .booking(toBookingResponse(booking))
+                .roomKeys(roomKeys.stream().map(this::toRoomKey).toList())
+                .extendsList(extendsList.stream().map(this::toExtend).toList())
+                .payments(payments.stream().map(this::toPayment).toList())
+                .build();
+    }
+
+    public BookingDetailResponse getBookingDetail1(Long bookingId) {
+
+        // 🔥 check ownership
+        Booking booking = bookingRepository
+                .findById(bookingId)
                 .orElseThrow(() -> new RuntimeException("BOOKING_NOT_FOUND"));
 
         // 🔥 lấy dữ liệu liên quan
@@ -941,5 +963,60 @@ public class BookingService {
     }
 
 
+    public Page<Booking> getBookings(
+            String status,
+            LocalDate date,
+            int page,
+            int size
+    ) {
+
+        Pageable pageable = PageRequest.of(
+                page,
+                size,
+                Sort.by("created_at").descending()
+        );
+
+        return bookingRepository.searchBookings(status, date, pageable);
+    }
+
+
+    public Page<Booking> search(BookingSearchRequest request, int page, int size) {
+
+        Pageable pageable = PageRequest.of(
+                page,
+                size,
+                Sort.by(Sort.Direction.DESC, "createdAt") // 🔥 mới nhất
+        );
+
+        Specification<Booking> spec = BookingSpecification.filter(request);
+
+        return bookingRepository.findAll(spec, pageable);
+    }
+
+    public Page<Booking> getOtaBookings(String channel, int page, int size) {
+
+        Pageable pageable = PageRequest.of(
+                page,
+                size,
+                Sort.by("createdAt").descending()
+        );
+
+        Specification<Booking> spec = (root, query, cb) -> {
+
+            List<Predicate> predicates = new ArrayList<>();
+
+            // 🔥 luôn là OTA
+            predicates.add(cb.equal(root.get("source"), "OTA"));
+
+            // 🔥 filter theo channel nếu có
+            if (channel != null && !channel.isEmpty()) {
+                predicates.add(cb.equal(root.get("channel"), channel));
+            }
+
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+
+        return bookingRepository.findAll(spec, pageable);
+    }
 
 }

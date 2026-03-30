@@ -4,11 +4,16 @@ import hotel_booking.dto.request.PayRequest;
 import hotel_booking.dto.request.PaymentRequest;
 import hotel_booking.dto.response.PaymentItemResponse;
 import hotel_booking.dto.response.PaymentSummaryResponse;
+import hotel_booking.dto.response.RevenueAdminDTO;
 import hotel_booking.dto.response.RevenueDashboardResponse;
 import hotel_booking.entity.*;
 import hotel_booking.repository.*;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -394,4 +399,38 @@ public class PaymentService {
                 .build();
     }
 
+    public Page<Payment> getPayments(
+            Integer bookingId,
+            String method,
+            String status,
+            LocalDate date,
+            int page,
+            int size
+    ) {
+
+        Pageable pageable = PageRequest.of(
+                page,
+                size,
+                Sort.by("created_at").descending()
+        );
+
+        return paymentRepository.searchPayments(
+                bookingId, method, status, date, pageable
+        );
+    }
+
+    public List<RevenueAdminDTO> getStatisticByType(
+            String method,
+            String status,
+            LocalDate date
+    ) {
+
+        return paymentRepository.statisticByPaymentType(method, status, date)
+                .stream()
+                .map(r -> new RevenueAdminDTO(
+                        (String) r[0],
+                        r[1] == null ? 0 : ((Number) r[1]).doubleValue()
+                ))
+                .toList();
+    }
 }

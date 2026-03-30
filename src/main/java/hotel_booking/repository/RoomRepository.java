@@ -62,4 +62,10 @@ public interface RoomRepository extends JpaRepository<Room, Long> {
 
     List<Room> findAll();
 
+    @Query(value = """
+        SELECT 
+            (COUNT(CASE WHEN status = 'OCCUPIED' THEN 1 END) * 100.0 / COUNT(*))
+        FROM Rooms
+    """, nativeQuery = true)
+    Double getOccupancyRate();
 }

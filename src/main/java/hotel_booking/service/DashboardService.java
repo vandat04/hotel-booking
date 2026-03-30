@@ -1,15 +1,10 @@
 package hotel_booking.service;
 
-import hotel_booking.dto.response.CleanerDashboardResponse;
-import hotel_booking.dto.response.RoomItemDTO;
-import hotel_booking.dto.response.RoomTypeDashboardDTO;
+import hotel_booking.dto.response.*;
 import hotel_booking.entity.Room;
 import hotel_booking.entity.RoomSchedule;
 import hotel_booking.entity.RoomType;
-import hotel_booking.repository.CleaningTaskRepository;
-import hotel_booking.repository.RoomRepository;
-import hotel_booking.repository.RoomScheduleRepository;
-import hotel_booking.repository.RoomTypeRepository;
+import hotel_booking.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Sort;
@@ -26,6 +21,8 @@ public class DashboardService {
     private final RoomTypeRepository roomTypeRepository;
     private final RoomRepository roomRepository;
     private final RoomScheduleRepository roomScheduleRepository;
+    private final PaymentRepository paymentRepository;
+    private final BookingRepository bookingRepository;
 
     public List<RoomTypeDashboardDTO> getDashboard() {
 
@@ -199,6 +196,70 @@ public class DashboardService {
                 done,
                 today
         );
+    }
+
+
+    public DashboardAdminResponse getAdminDashboard() {
+
+        DashboardAdminResponse res = new DashboardAdminResponse();
+
+        // 1. Revenue theo ngày
+        res.setRevenueByTime(
+                paymentRepository.getRevenueByDate()
+                        .stream()
+                        .map(r -> new RevenueDTO(
+                                r[0].toString(),
+                                ((Number) r[1]).doubleValue()
+                        ))
+                        .toList()
+        );
+
+        // 2. Revenue theo method
+        res.setRevenueByMethod(
+                paymentRepository.getRevenueByMethod()
+                        .stream()
+                        .map(r -> new RevenueDTO(
+                                (String) r[0],
+                                ((Number) r[1]).doubleValue()
+                        ))
+                        .toList()
+        );
+
+        // 3. Tổng booking
+        res.setTotalBookings(
+                bookingRepository.countAllBookings()
+        );
+
+        // 4. Occupancy
+        res.setOccupancyRate(
+                roomRepository.getOccupancyRate()
+        );
+
+        // 5. Revenue compare
+        res.setActualRevenue(
+                paymentRepository.getActualRevenue()
+        );
+
+        res.setExpectedRevenue(
+                bookingRepository.getExpectedRevenue()
+        );
+
+        res.setRevenueByRoomType(
+                paymentRepository.getRevenueByRoomType()
+                        .stream()
+                        .map(r -> new RevenueDTO(
+                                (String) r[0],
+                                ((Number) r[1]).doubleValue()
+                        ))
+                        .toList()
+        );
+
+        // 6. KPI
+        res.setTopRoomType(
+                roomScheduleRepository.getTopRoomType()
+        );
+
+        return res;
     }
 
 }

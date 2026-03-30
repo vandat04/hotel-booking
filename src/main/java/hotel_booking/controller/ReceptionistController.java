@@ -30,9 +30,9 @@ public class ReceptionistController
 
     @GetMapping("/dashboard")
     public List<RoomTypeDashboardDTO> getDashboard(
-            @RequestParam(required = false) Long typeIds
+            @RequestParam(required = false) Long typeId
     ) {
-        return Collections.singletonList(dashboardService.getReceptionistDashboard(typeIds));
+        return Collections.singletonList(dashboardService.getReceptionistDashboard(typeId));
     }
 
     @GetMapping("/bookings")

@@ -13,6 +13,10 @@ import hotel_booking.repository.PenaltyRepository;
 import hotel_booking.repository.SlotWorkRepository;
 import hotel_booking.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -137,4 +141,22 @@ public class AttendanceService {
 
         return res;
     }
+
+    public Page<Attendance> getAttendance(
+            LocalDate date,
+            Integer slotId,
+            int page,
+            int size
+    ) {
+
+        Pageable pageable = PageRequest.of(
+                page,
+                size,
+                Sort.by("work_date").descending()
+                        .and(Sort.by("check_in").descending())
+        );
+
+        return attendanceRepository.searchAttendance(date, slotId, pageable);
+    }
+
 }

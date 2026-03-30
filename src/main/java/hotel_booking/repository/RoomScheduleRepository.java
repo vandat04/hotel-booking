@@ -53,4 +53,15 @@ public interface RoomScheduleRepository extends JpaRepository<RoomSchedule, Long
                 AND CURRENT_TIMESTAMP BETWEEN rs.startTime AND rs.endTime
             """)
     Optional<RoomSchedule> findCurrentByRoomId(Long roomId);
+
+    @Query(value = """
+        SELECT TOP 1 rt.name
+        FROM Bookings b
+        JOIN RoomSchedules rs ON rs.booking_id = b.id
+        JOIN Rooms r ON rs.room_id = r.id
+        JOIN RoomTypes rt ON r.type_id = rt.id
+        GROUP BY rt.name
+        ORDER BY COUNT(*) DESC
+    """, nativeQuery = true)
+    String getTopRoomType();
 }

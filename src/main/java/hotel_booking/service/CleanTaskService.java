@@ -14,6 +14,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
+
 @Service
 @RequiredArgsConstructor
 public class CleanTaskService {
@@ -116,6 +118,22 @@ public class CleanTaskService {
         }
 
         return res;
+    }
+
+    public Page<CleaningTask> getCleaningTasks(
+            String status,
+            LocalDate date,
+            int page,
+            int size
+    ) {
+
+        Pageable pageable = PageRequest.of(
+                page,
+                size,
+                Sort.by("created_at").descending()
+        );
+
+        return cleanTaskRepository.searchCleaningTasks(status, date, pageable);
     }
 
 }
