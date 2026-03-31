@@ -34,20 +34,38 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     FilterChain filterChain)
             throws ServletException, IOException {
 
+        String path = request.getRequestURI();
+
+        // ✅ 1. Cho phép API auth (login/register)
+        if (path.startsWith("/auth")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        // ✅ 2. Cho phép preflight request (CORS)
+        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        // ===== phần cũ của bạn =====
+
         final String authHeader = request.getHeader("Authorization");
 
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
             return;
         }
+
         String token = authHeader.substring(7);
+
         // 🔥 check blacklist
         if (invalidTokenRepository.existsByToken(token)) {
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.getWriter().write("Token đã bị vô hiệu hóa");
             return;
         }
-        // 🔥 lấy userId từ JWT
+
         String userIdStr = jwtService.extractUserId(token);
 
         if (userIdStr != null && SecurityContextHolder.getContext().getAuthentication() == null) {
@@ -57,12 +75,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 Long userId = Long.parseLong(userIdStr);
                 UserDetails userDetails = userDetailsService.loadUserById(userId.intValue());
 
-                System.out.println(userDetails.getAuthorities());// 🔥 KHÔNG cần load DB nữa
                 UsernamePasswordAuthenticationToken authToken =
                         new UsernamePasswordAuthenticationToken(
-                                userId,   // 🔥 principal = userId
+                                userId,
                                 null,
-                                userDetails.getAuthorities()      // hoặc authorities nếu có
+                                userDetails.getAuthorities()
                         );
 
                 SecurityContextHolder.getContext().setAuthentication(authToken);
