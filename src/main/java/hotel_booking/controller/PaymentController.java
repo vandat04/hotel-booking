@@ -10,6 +10,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import jakarta.servlet.http.HttpServletResponse;
 
 import java.util.Map;
 
@@ -37,8 +38,9 @@ public class PaymentController {
     }
 
     @GetMapping("/vnpay-return")
-    public String vnpayReturn(@RequestParam Map<String, String> params) {
+    public void vnpayReturn(@RequestParam Map<String, String> params, HttpServletResponse response) throws java.io.IOException {
         paymentService.handleVnPayReturn(params);
-        return "redirect:/payment-result";
+        // Sau khi xử lý thanh toán xong ở Backend, chuyển hướng trình duyệt về lại Frontend
+        response.sendRedirect("http://127.0.0.1:5500/hotel-booking-fe/profile.html");
     }
 }
