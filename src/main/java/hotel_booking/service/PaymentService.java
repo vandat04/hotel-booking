@@ -131,11 +131,6 @@ public class PaymentService {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new RuntimeException("Booking không tồn tại"));
 
-        // 🔥 2. Check phải CHECKED_OUT
-        if (!"CHECKED_OUT".equals(booking.getStatus())) {
-            throw new RuntimeException("Booking chưa checkout");
-        }
-
         // 🔥 3. Lấy tất cả payments (để hiển thị)
         List<Payment> allPayments = paymentRepository.findByBookingId(bookingId);
 
@@ -251,8 +246,8 @@ public class PaymentService {
         Booking booking = bookingRepository.findById(request.getBookingId())
                 .orElseThrow(() -> new RuntimeException("Booking không tồn tại"));
 
-        if (!"CHECKED_OUT".equals(booking.getStatus())) {
-            throw new RuntimeException("Booking chưa checkout");
+        if (!"CHECKED_OUT".equals(booking.getStatus()) && "FINAL".equals(request.getMethod())) {
+            throw new RuntimeException("Booking chưa checkout. không thể thanh toán FINAL");
         }
 
         // 🔥 3. Lấy payment theo id
@@ -280,7 +275,7 @@ public class PaymentService {
         // 🔥 5. Check nếu đã thanh toán đủ → FINISHED
         PaymentSummaryResponse summary = calculatePayment(request.getBookingId());
 
-        if (summary.getRemainingAmount().compareTo(BigDecimal.ZERO) == 0) {
+        if (summary.getRemainingAmount().compareTo(BigDecimal.ZERO) == 0 && "FINAL".equals(request.getMethod())) {
             booking.setStatus("FINISHED");
             bookingRepository.save(booking);
         }

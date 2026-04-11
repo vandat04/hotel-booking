@@ -106,6 +106,7 @@ public class CleanTaskService {
         CleanTaskDetailResponse res = new CleanTaskDetailResponse();
 
         res.setId(task.getId());
+        res.setRoomId(task.getRoomId());
         res.setStatus(task.getStatus());
         res.setCleanerId(task.getCleanerId());
         res.setCreatedAt(task.getCreatedAt());

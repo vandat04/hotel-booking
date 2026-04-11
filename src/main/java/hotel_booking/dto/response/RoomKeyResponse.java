@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 public class RoomKeyResponse {
     private Long id;
     private Long roomId;
+    private String roomNumber;
     private String qrCode;
     private String numberCode;
     private Integer status;

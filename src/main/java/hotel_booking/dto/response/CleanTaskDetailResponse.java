@@ -11,6 +11,7 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class CleanTaskDetailResponse {
     private Long id;
+    private Long roomId;
     private String status;
     private Long cleanerId;
     private LocalDateTime createdAt;

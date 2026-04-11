@@ -149,7 +149,7 @@ public class PenaltiesService {
         PenaltyResponse res = new PenaltyResponse();
 
         res.setId(p.getId());
-        res.setUserId(p.getId());
+        res.setUserId(p.getUserId());
         User user = userRepository.findById(p.getUserId()).orElseThrow(() -> new RuntimeException("You have not checked in yet"));
         res.setUsername(user.getUsername());
         res.setWorkDate(p.getWorkDate());

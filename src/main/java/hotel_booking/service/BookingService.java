@@ -319,9 +319,11 @@ public class BookingService {
     }
 
     private RoomKeyResponse toRoomKey(RoomKey r) {
+        String roomNumber = roomRepository.findById(r.getRoomId()).get().getRoomNumber();
         return RoomKeyResponse.builder()
                 .id(r.getId())
                 .roomId(r.getRoomId())
+                .roomNumber(roomNumber)
                 .qrCode(r.getQrCode())
                 .numberCode(r.getNumberCode())
                 .status(r.getStatus())
@@ -742,9 +744,6 @@ public class BookingService {
         // ===== STEP 2: VALIDATE =====
 
         // 2.1 Status phải là BOOKED
-        if (!"BOOKED".equalsIgnoreCase(booking.getStatus())) {
-            throw new RuntimeException("Booking must be BOOKED to check-in");
-        }
 
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime checkIn = booking.getCheckIn();
