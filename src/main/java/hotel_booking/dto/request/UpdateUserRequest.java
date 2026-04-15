@@ -9,6 +9,4 @@ public class UpdateUserRequest {
     private String avatarUrl;
     private String role;   // ADMIN chỉ nên update role khi cần
     private Integer status; // 1: ACTIVE, 2: INACTIVE, 3: BANNED
-    private String address;
-    private java.time.LocalDate dob;
 }
