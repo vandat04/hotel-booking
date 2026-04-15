@@ -20,5 +20,10 @@ public class UserProfileResponse {
     private String avatarUrl;
     private String role;
     private Integer status;
+    private String address;
+    private java.time.LocalDate dob;
+    private Boolean emailVerified;
+    private String provider;
     private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 }

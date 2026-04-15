@@ -13,4 +13,6 @@ public class CreateStaffRequest {
 
     // chỉ cho phép CLEANER / RECEPTIONIST
     private String role;
+    private String address;
+    private java.time.LocalDate dob;
 }

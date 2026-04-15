@@ -74,15 +74,6 @@ public class UserService {
             user.setPhone(request.getPhone());
         }
 
-        // =============================
-        //  UPLOAD AVATAR
-        if (file != null && !file.isEmpty()) {
-
-            String imageUrl = cloudinaryService.uploadFile1(file);
-
-            user.setAvatarUrl(imageUrl);
-        }
-
         user.setUpdatedAt(LocalDateTime.now());
 
         userRepository.save(user);
@@ -90,7 +81,6 @@ public class UserService {
 
     // =============================
     public UserProfileResponse getProfile() {
-
         String currentUserId = SecurityContextHolder.getContext()
                 .getAuthentication()
                 .getName();
@@ -100,17 +90,7 @@ public class UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User không tồn tại"));
 
-        return UserProfileResponse.builder()
-                .id(user.getId())
-                .username(user.getUsername())
-                .email(user.getEmail())
-                .fullName(user.getFullName())
-                .phone(user.getPhone())
-                .avatarUrl(user.getAvatarUrl())
-                .role(user.getRole())
-                .status(user.getStatus())
-                .createdAt(user.getCreatedAt())
-                .build();
+        return toResponse(user);
     }
 
     // =============================
@@ -168,6 +148,7 @@ public class UserService {
                 .role(role)
                 .status(1) // ACTIVE
                 .provider("LOCAL")
+                .createdAt(LocalDateTime.now())
                 .build();
 
         return userRepository.save(user);
@@ -252,8 +233,8 @@ public class UserService {
             user.setFullName(request.getFullName());
         }
 
-        if (request.getPhone() != null) {
-            // check trùng phone
+        if (request.getPhone() != null && !request.getPhone().equals(user.getPhone())) {
+            // check trùng phone (chỉ khi phone thực sự thay đổi)
             if (userRepository.existsByPhone(request.getPhone())) {
                 throw new RuntimeException("Phone already exists");
             }
@@ -342,16 +323,19 @@ public class UserService {
     }
 
     private UserProfileResponse toResponse(User entity) {
-        UserProfileResponse dto = new UserProfileResponse();
-        dto.setId(entity.getId());
-        dto.setUsername(entity.getUsername());
-        dto.setEmail(entity.getEmail());
-        dto.setFullName(entity.getFullName());
-        dto.setPhone(entity.getPhone());
-        dto.setAvatarUrl(entity.getAvatarUrl());
-        dto.setRole(entity.getRole());
-        dto.setStatus(entity.getStatus());
-        dto.setCreatedAt(entity.getCreatedAt());
-        return dto;
+        return UserProfileResponse.builder()
+                .id(entity.getId())
+                .username(entity.getUsername())
+                .email(entity.getEmail())
+                .fullName(entity.getFullName())
+                .phone(entity.getPhone())
+                .avatarUrl(entity.getAvatarUrl())
+                .role(entity.getRole())
+                .status(entity.getStatus())
+                .emailVerified(entity.getEmailVerified())
+                .provider(entity.getProvider())
+                .createdAt(entity.getCreatedAt())
+                .updatedAt(entity.getUpdatedAt())
+                .build();
     }
 }
