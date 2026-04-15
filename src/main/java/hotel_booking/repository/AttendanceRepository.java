@@ -15,7 +15,7 @@ import java.util.Optional;
 @Repository
 public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
 
-    Optional<Attendance> findByUserIdAndWorkDate(Integer userId, LocalDate workDate);
+    Optional<Attendance> findByUserIdAndWorkDate(Long userId, LocalDate workDate);
 
     @Query("""
                 SELECT a FROM Attendance a
@@ -32,7 +32,7 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
                   AND MONTH(a.workDate) = :month
                   AND YEAR(a.workDate) = :year
             """)
-    Integer countAttendance(Integer userId, int month, int year);
+    Integer countAttendance(Long userId, int month, int year);
 
     @Query(value = """
                 SELECT * FROM Attendance a
@@ -52,4 +52,10 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
     );
 
 
+    Page<Attendance> findByUserIdAndWorkDate(Long userId, LocalDate workDate, Pageable pageable);
+
+    @Query("SELECT a FROM Attendance a WHERE a.userId = :userId AND (:workDate IS NULL OR a.workDate = :workDate)")
+    Page<Attendance> findByUserIdAndWorkDatePageable(@Param("userId") Long userId, @Param("workDate") LocalDate workDate, Pageable pageable);
+
+    Page<Attendance> findByUserId(Long userId, Pageable pageable);
 }

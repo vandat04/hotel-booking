@@ -337,7 +337,7 @@ public class SalaryService {
 
         // 3. Số buổi đi làm
         Integer totalAttendance =
-                attendanceRepository.countAttendance(userId, month, year);
+                attendanceRepository.countAttendance(userId.longValue(), month, year);
 
         if (totalAttendance == null) {
             totalAttendance = 0;

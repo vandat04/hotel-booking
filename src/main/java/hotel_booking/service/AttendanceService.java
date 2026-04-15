@@ -50,7 +50,7 @@ public class AttendanceService {
         LocalTime now = LocalTime.now();
 
         // check đã check-in chưa
-        if (attendanceRepository.findByUserIdAndWorkDate(user.getId(), today).isPresent()) {
+        if (attendanceRepository.findByUserIdAndWorkDate(user.getId().longValue(), today).isPresent()) {
             throw new RuntimeException("Already checked in today");
         }
 
@@ -99,7 +99,7 @@ public class AttendanceService {
         LocalTime now = LocalTime.now();
 
         Attendance attendance = attendanceRepository
-                .findByUserIdAndWorkDate(user.getId(), today)
+                .findByUserIdAndWorkDate(user.getId().longValue(), today)
                 .orElseThrow(() -> new RuntimeException("You have not checked in yet"));
 
         if (attendance.getCheckOut() != null) {
@@ -132,7 +132,7 @@ public class AttendanceService {
 
         AttendanceResponse res = new AttendanceResponse();
         res.setId(entity.getId().intValue());
-        res.setUserId(entity.getId());
+        res.setUserId(entity.getUserId());
         res.setWorkDate(entity.getWorkDate());
         res.setCheckIn(entity.getCheckIn());
         res.setCheckOut(entity.getCheckOut());
@@ -159,4 +159,16 @@ public class AttendanceService {
         return attendanceRepository.searchAttendance(date, slotId, pageable);
     }
 
+    public Page<AttendanceResponse> getAttendanceByUser(
+            Long userId,
+            LocalDate date,
+            int page,
+            int size
+    ) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("workDate").descending());
+        if (date != null) {
+            return attendanceRepository.findByUserIdAndWorkDatePageable(userId, date, pageable).map(this::toResponse);
+        }
+        return attendanceRepository.findByUserId(userId, pageable).map(this::toResponse);
+    }
 }
