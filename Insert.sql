@@ -1,14 +1,14 @@
 ﻿USE HotelDB;
 GO
-
+--All password: 123123
 INSERT INTO Users (username, password_hash, provider, email, email_verified, full_name, phone, avatar_url, role, status, created_at, updated_at)
 VALUES
 -- ADMIN
-('admin_user', 'hashed_password_admin', 'LOCAL', 'admin@example.com', 1, 'Admin User', '0901000001', 'https://example.com/avatar/admin.png', 'ADMIN', 1, GETDATE(), GETDATE()),
+('admin_user', '$2a$10$OwEVq/j00c/HhMfHUkJ9JuMVCZGv3XrmXYCWApMqtFO1HdHWN.SdG', 'LOCAL', 'admin@example.com', 1, 'Admin User', '0901000001', 'https://example.com/avatar/admin.png', 'ADMIN', 1, GETDATE(), GETDATE()),
 -- CLEANER
-('cleaner_user', 'hashed_password_cleaner', 'LOCAL', 'cleaner@example.com', 1, 'Cleaner User', '0901000003', 'https://example.com/avatar/cleaner.png', 'CLEANER', 1, GETDATE(), GETDATE()),
+('cleaner_user', '$2a$10$OwEVq/j00c/HhMfHUkJ9JuMVCZGv3XrmXYCWApMqtFO1HdHWN.SdG', 'LOCAL', 'cleaner@example.com', 1, 'Cleaner User', '0901000003', 'https://example.com/avatar/cleaner.png', 'CLEANER', 1, GETDATE(), GETDATE()),
 -- RECEPTIONIST
-('reception_user', 'hashed_password_reception', 'LOCAL', 'reception@example.com', 1, 'Receptionist User', '0901000004', 'https://example.com/avatar/reception.png', 'RECEPTIONIST', 1, GETDATE(), GETDATE());
+('reception_user', '$2a$10$OwEVq/j00c/HhMfHUkJ9JuMVCZGv3XrmXYCWApMqtFO1HdHWN.SdG', 'LOCAL', 'reception@example.com', 1, 'Receptionist User', '0901000004', 'https://example.com/avatar/reception.png', 'RECEPTIONIST', 1, GETDATE(), GETDATE());
 GO
 
 INSERT INTO SalaryOfRole (role, salary, created_at, updated_at)
