@@ -1,14 +1,14 @@
 ﻿USE HotelDB;
 GO
-
+--All password: 123123
 INSERT INTO Users (username, password_hash, provider, email, email_verified, full_name, phone, avatar_url, role, status, created_at, updated_at)
 VALUES
 -- ADMIN
-('admin_user', 'hashed_password_admin', 'LOCAL', 'admin@example.com', 1, 'Admin User', '0901000001', 'https://example.com/avatar/admin.png', 'ADMIN', 1, GETDATE(), GETDATE()),
+('admin_user', '$2a$10$OwEVq/j00c/HhMfHUkJ9JuMVCZGv3XrmXYCWApMqtFO1HdHWN.SdG', 'LOCAL', 'admin@example.com', 1, 'Admin User', '0901000001', 'https://example.com/avatar/admin.png', 'ADMIN', 1, GETDATE(), GETDATE()),
 -- CLEANER
-('cleaner_user', 'hashed_password_cleaner', 'LOCAL', 'cleaner@example.com', 1, 'Cleaner User', '0901000003', 'https://example.com/avatar/cleaner.png', 'CLEANER', 1, GETDATE(), GETDATE()),
+('cleaner_user', '$2a$10$OwEVq/j00c/HhMfHUkJ9JuMVCZGv3XrmXYCWApMqtFO1HdHWN.SdG', 'LOCAL', 'cleaner@example.com', 1, 'Cleaner User', '0901000003', 'https://example.com/avatar/cleaner.png', 'CLEANER', 1, GETDATE(), GETDATE()),
 -- RECEPTIONIST
-('reception_user', 'hashed_password_reception', 'LOCAL', 'reception@example.com', 1, 'Receptionist User', '0901000004', 'https://example.com/avatar/reception.png', 'RECEPTIONIST', 1, GETDATE(), GETDATE());
+('reception_user', '$2a$10$OwEVq/j00c/HhMfHUkJ9JuMVCZGv3XrmXYCWApMqtFO1HdHWN.SdG', 'LOCAL', 'reception@example.com', 1, 'Receptionist User', '0901000004', 'https://example.com/avatar/reception.png', 'RECEPTIONIST', 1, GETDATE(), GETDATE());
 GO
 
 INSERT INTO SalaryOfRole (role, salary, created_at, updated_at)
@@ -29,11 +29,11 @@ GO
 
 INSERT INTO RoomTypes (name, price_hour, price_day, description, status)
 VALUES
-('Standard', 50.00, 200.00, 'Standard room, suitable for 1-2 guests', 1),
-('Deluxe', 80.00, 350.00, 'Deluxe room with nice view, suitable for 2-3 guests', 1),
-('Suite', 150.00, 600.00, 'Luxury suite with full amenities, suitable for small groups', 1),
-('VIP', 250.00, 1000.00, 'VIP room with complete amenities, for premium guests', 1),
-('GOD', 2500.00, 10000.00, 'GOD room with billions', 1);
+('Standard', 500000.00, 2000000.00, 'Standard room, suitable for 1-2 guests', 1),
+('Deluxe', 800000.00, 3500000.00, 'Deluxe room with nice view, suitable for 2-3 guests', 1),
+('Suite', 1500000.00, 6000000.00, 'Luxury suite with full amenities, suitable for small groups', 1),
+('VIP', 2500000.00, 10000000.00, 'VIP room with complete amenities, for premium guests', 1),
+('GOD', 25000000.00, 10000000.00, 'GOD room with billions', 1);
 GO
 
 INSERT INTO RoomPicture (room_type_id, ima_url, public_id)
@@ -55,32 +55,32 @@ GO
 INSERT INTO RoomItems (room_type_id, name, quantity, price, status)
 VALUES
 -- Standard Room Items
-(1, 'Single Bed', 2, 50.00, 1),
-(1, 'Wardrobe', 1, 20.00, 1),
-(1, 'Desk', 1, 15.00, 1),
+(1, 'Single Bed', 2, 50000.00, 1),
+(1, 'Wardrobe', 1, 20000.00, 1),
+(1, 'Desk', 1, 15000.00, 1),
 
 -- Deluxe Room Items
-(2, 'Double Bed', 1, 80.00, 1),
-(2, 'Wardrobe', 1, 25.00, 1),
-(2, 'Desk', 1, 20.00, 1),
-(2, 'TV', 1, 50.00, 1),
+(2, 'Double Bed', 1, 80000.00, 1),
+(2, 'Wardrobe', 1, 25000.00, 1),
+(2, 'Desk', 1, 20000.00, 1),
+(2, 'TV', 1, 500000.00, 1),
 
 -- Suite Room Items
-(3, 'King Bed', 1, 120.00, 1),
-(3, 'Sofa', 1, 60.00, 1),
-(3, 'Wardrobe', 1, 30.00, 1),
-(3, 'Desk', 1, 20.00, 1),
-(3, 'TV', 1, 70.00, 1),
-(3, 'Mini Bar', 1, 40.00, 1),
+(3, 'King Bed', 1, 120000.00, 1),
+(3, 'Sofa', 1, 60000.00, 1),
+(3, 'Wardrobe', 1, 30000.00, 1),
+(3, 'Desk', 1, 20000.00, 1),
+(3, 'TV', 1, 70000.00, 1),
+(3, 'Mini Bar', 1, 40000.00, 1),
 
 -- VIP Room Items
-(4, 'King Bed', 1, 150.00, 1),
-(4, 'Sofa', 2, 70.00, 1),
-(4, 'Wardrobe', 2, 35.00, 1),
-(4, 'Desk', 1, 25.00, 1),
-(4, 'TV', 2, 80.00, 1),
-(4, 'Mini Bar', 1, 50.00, 1),
-(4, 'Jacuzzi', 1, 200.00, 1);
+(4, 'King Bed', 1, 150000.00, 1),
+(4, 'Sofa', 2, 70000.00, 1),
+(4, 'Wardrobe', 2, 35000.00, 1),
+(4, 'Desk', 1, 25000.00, 1),
+(4, 'TV', 2, 80000.00, 1),
+(4, 'Mini Bar', 1, 50000.00, 1),
+(4, 'Jacuzzi', 1, 200000.00, 1);
 GO
 
 INSERT INTO Rooms (room_number, type_id, status)
