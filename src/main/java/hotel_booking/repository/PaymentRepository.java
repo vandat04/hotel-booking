@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -120,5 +121,10 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
             @Param("method") String method,
             @Param("status") String status,
             @Param("date") LocalDate date
+    );
+
+    List<Payment> findByCreatedAtBetween(
+            LocalDateTime start,
+            LocalDateTime end
     );
 }

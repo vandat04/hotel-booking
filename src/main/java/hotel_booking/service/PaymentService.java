@@ -286,7 +286,8 @@ public class PaymentService {
     @Transactional
     public RevenueDashboardResponse getTodayRevenue(Long typeIdInput) {
 
-        // 🔥 1. Xác định typeId
+        // ===== 1. Lấy RoomType =====
+
         Long typeId = typeIdInput != null
                 ? typeIdInput
                 : roomTypeRepository.findAll()
@@ -298,8 +299,10 @@ public class PaymentService {
         RoomType roomType = roomTypeRepository.findById(typeId)
                 .orElseThrow(() -> new RuntimeException("RoomType không tồn tại"));
 
-        // 🔥 2. Lấy Rooms
+        // ===== 2. Lấy room theo type =====
+
         List<Room> rooms = roomRepository.findByTypeId(typeId);
+
         Set<Long> roomIds = rooms.stream()
                 .map(Room::getId)
                 .collect(Collectors.toSet());
@@ -308,8 +311,10 @@ public class PaymentService {
             return emptyResponse(roomType);
         }
 
-        // 🔥 3. RoomKey → Booking
-        List<RoomKey> roomKeys = roomKeyRepository.findByRoomIdIn(roomIds);
+        // ===== 3. RoomKey -> Booking =====
+
+        List<RoomKey> roomKeys =
+                roomKeyRepository.findByRoomIdIn(roomIds);
 
         Set<Long> bookingIds = roomKeys.stream()
                 .map(RoomKey::getBookingId)
@@ -319,54 +324,90 @@ public class PaymentService {
             return emptyResponse(roomType);
         }
 
-        // 🔥 4. Booking hôm nay
+        // ===== 4. Booking =====
+
+        List<Booking> bookings =
+                bookingRepository.findByIdIn(bookingIds);
+
         LocalDate today = LocalDate.now();
 
-        List<Booking> bookings = bookingRepository.findByIdIn(bookingIds);
+        // ===== 5. Expected Revenue =====
+        // Booking tạo hôm nay
 
         List<Booking> todayBookings = bookings.stream()
-                .filter(b -> b.getCreatedAt() != null &&
-                        b.getCreatedAt().toLocalDate().equals(today))
+                .filter(b ->
+                        b.getCreatedAt() != null &&
+                                b.getCreatedAt().toLocalDate().equals(today)
+                )
                 .toList();
 
-        if (todayBookings.isEmpty()) {
-            return emptyResponse(roomType);
-        }
-
-        // 🔥 5. Expected revenue
         BigDecimal expectedRevenue = todayBookings.stream()
                 .map(b -> safe(b.getTotalPrice()))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        // 🔥 6. Payments
-        Set<Long> todayBookingIds = todayBookings.stream()
-                .map(Booking::getId)
-                .collect(Collectors.toSet());
+        // ===== 6. Payment hôm nay =====
 
-        List<Payment> payments = paymentRepository.findByBookingIdIn(todayBookingIds);
+        LocalDateTime start = today.atStartOfDay();
+        LocalDateTime end = today.plusDays(1).atStartOfDay();
 
-        // 🔥 7. Actual revenue (PAID)
-        BigDecimal actualRevenue = payments.stream()
-                .filter(p -> "PAID".equals(p.getStatus()))
+        List<Payment> todayPayments =
+                paymentRepository.findByCreatedAtBetween(start, end);
+
+        // DEBUG
+        System.out.println("TODAY PAYMENTS = " + todayPayments.size());
+
+        todayPayments.forEach(p -> {
+            System.out.println(
+                    "ID = " + p.getId()
+                            + " | amount = " + p.getAmount()
+                            + " | status = " + p.getStatus()
+                            + " | createdAt = " + p.getCreatedAt()
+            );
+        });
+
+        // ===== 7. Actual Revenue =====
+
+        BigDecimal actualRevenue = todayPayments.stream()
+                .filter(p ->
+                        p.getStatus() != null &&
+                                p.getStatus().trim().equalsIgnoreCase("PAID")
+                )
                 .map(p -> safe(p.getAmount()))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        // 🔥 8. Group method + status
+        // ===== 8. Group =====
+
         Map<String, BigDecimal> revenueByMethod = new HashMap<>();
         Map<String, BigDecimal> revenueByStatus = new HashMap<>();
 
-        for (Payment p : payments) {
+        for (Payment p : todayPayments) {
 
             BigDecimal amount = safe(p.getAmount());
 
-            // method
-            String method = p.getMethod() != null ? p.getMethod() : "UNKNOWN";
-            revenueByMethod.merge(method, amount, BigDecimal::add);
+            // METHOD
+            String method = p.getMethod() != null
+                    ? p.getMethod()
+                    : "UNKNOWN";
 
-            // status
-            String status = p.getStatus();
-            revenueByStatus.merge(status, amount, BigDecimal::add);
+            revenueByMethod.merge(
+                    method,
+                    amount,
+                    BigDecimal::add
+            );
+
+            // STATUS
+            String status = p.getStatus() != null
+                    ? p.getStatus()
+                    : "UNKNOWN";
+
+            revenueByStatus.merge(
+                    status,
+                    amount,
+                    BigDecimal::add
+            );
         }
+
+        // ===== 9. Response =====
 
         return RevenueDashboardResponse.builder()
                 .typeId(typeId)

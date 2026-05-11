@@ -51,7 +51,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
                 JOIN Attendance a ON u.id = a.userId
                 WHERE u.role = 'CLEANER'
                 AND a.workDate = CURRENT_DATE
-                AND a.status = 1
+                AND u.status = 1
             """)
     List<User> findAvailableCleanersToday();
 
